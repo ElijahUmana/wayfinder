@@ -1,0 +1,17 @@
+[project]
+name = "wayfinder-backend"
+version = "0.1.0"
+description = "Wayfinder — AI-Guided Immersive City Journeys"
+requires-python = ">=3.10"
+dependencies = [
+    "railtracks[all]",
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pydantic",
+    "python-dotenv",
+    "openai",
+    "anthropic",
+    "assistant-stream",
+    "auggie-sdk",
+]

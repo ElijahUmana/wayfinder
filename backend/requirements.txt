@@ -1,0 +1,10 @@
+railtracks[all]
+fastapi
+uvicorn[standard]
+httpx
+pydantic
+python-dotenv
+openai
+anthropic
+assistant-stream
+auggie-sdk
