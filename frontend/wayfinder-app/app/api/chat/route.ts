@@ -6,23 +6,33 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
 
 const SYSTEM_PROMPT = `You are Wayfinder, an AI-powered immersive city guide for San Francisco.
 
-When a user asks about visiting a place, wants directions, or mentions a destination:
-1. Call plan_journey to get transit directions, weather, and knowledge base context
-2. Use the plan_journey result to call show_weather_card with weather data
-3. Use the plan_journey result to call show_map_route with route data
+WHEN A USER UPLOADS A PHOTO:
+1. Analyze the image using your vision capabilities to identify the location — look for landmarks, architecture, signage, geography
+2. Name the location or narrow it to a specific neighborhood/street
+3. Call plan_journey with the identified destination
+4. Then proceed with the full journey generation below
+
+WHEN A USER MENTIONS A DESTINATION (text or identified from photo):
+1. Call plan_journey to get transit directions, weather, knowledge base context, and POIs
+2. Use the result to call show_weather_card with the weather data
+3. Use the result to call show_map_route with route data including segments and POIs
 4. Generate 4-6 journey chapters using generate_journey_chapter for each segment:
-   - Chapter 0: "The Departure" — user's starting point
-   - Chapters 1-N: Each transit/walking segment
-   - Final Chapter: "The Arrival" — the destination
-5. Each chapter should have engaging narration with specific street names, landmarks, and insider tips
+   - Chapter 0: "The Departure" — user's starting point, setting the scene
+   - Chapters 1-N: Each transit ride, transfer, or walking segment along the route
+   - Final Chapter: "The Arrival" — arriving at the destination, what to see first
+5. Each chapter MUST have vivid, specific narration (2-4 sentences) with actual street names, landmarks, historical facts, and insider tips
+6. Each chapter MUST have a music_mood and relevant pois
 
-For music_mood, use one of: "departure", "transit_urban", "walking", "anticipation", "arrival", "scenic", "evening", "explore", "cafe", "cultural".
+For music_mood, assign based on segment energy:
+- "departure" (calm, starting out), "transit_urban" (lo-fi beats for bus/train), "walking" (confident stride)
+- "anticipation" (building excitement), "arrival" (celebratory), "scenic" (nature/views)
+- "evening" (chill), "explore" (discovery), "cafe" (relaxed), "cultural" (classical)
 
-If no destination is specified, ask what they want to explore or suggest popular SF spots.
+NARRATION STYLE: Write as a knowledgeable local friend — enthusiastic but authentic, specific but not scripted. Include insider tips most visitors miss. Reference the time of day, the direction of travel, things to look for out the window. Make each chapter feel like a moment in a story, not just directions.
 
-Be enthusiastic but authentic. Sound like a knowledgeable local friend.
+If no destination is specified, ask what they want to explore or suggest popular SF spots with brief vivid descriptions.
 
-IMPORTANT: When you have journey data from plan_journey, ALWAYS call the display tools to render the rich UI. Don't just describe things in text.`;
+IMPORTANT: ALWAYS call the display tools (show_weather_card, show_map_route, generate_journey_chapter) to create the immersive experience. Never just describe the journey in text.`;
 
 const TOOLS = [
   {
@@ -170,14 +180,14 @@ const TOOLS = [
 
 const MOOD_PLAYLISTS: Record<string, { id: string; name: string }> = {
   departure: { id: "37i9dQZF1DX1s9knjP51Oa", name: "Calm Vibes" },
-  transit_urban: { id: "37i9dQZF1DXc8kgYqMLFJR", name: "Lo-Fi Beats" },
+  transit_urban: { id: "37i9dQZF1DWWQRwui0ExPn", name: "Lo-Fi Beats" },
   walking: { id: "37i9dQZF1DX0SM0LYsmbMT", name: "Confidence Boost" },
   anticipation: { id: "37i9dQZF1DX4fpCWaHOned", name: "Building Energy" },
   arrival: { id: "37i9dQZF1DX2sUQwD7tbmL", name: "Feel-Good Indie" },
   scenic: { id: "37i9dQZF1DX4sWSpwq3LiO", name: "Peaceful Piano" },
   evening: { id: "37i9dQZF1DX6VdMW310YC7", name: "Chill Hits" },
   explore: { id: "37i9dQZF1DX2apWzyECwyZ", name: "This Is San Francisco" },
-  cafe: { id: "37i9dQZF1DX6ziVCJnEm59", name: "Coffee Shop Jazz" },
+  cafe: { id: "37i9dQZF1DX6ziVCJnEm59", name: "Jazz Vibes" },
   cultural: { id: "37i9dQZF1DWWEJlAGA9gs0", name: "Classical Essentials" },
 };
 
@@ -241,6 +251,17 @@ export async function POST(req: Request) {
       for (const p of content) {
         if (p.type === "text") {
           parts.push({ type: "text", text: p.text });
+        } else if (p.type === "image" && p.dataUrl) {
+          // Convert data URL to Anthropic image format
+          const dataUrl = p.dataUrl as string;
+          if (dataUrl.startsWith("data:")) {
+            const mediaType = dataUrl.split(";")[0].split(":")[1];
+            const b64Data = dataUrl.split(",")[1];
+            parts.push({
+              type: "image",
+              source: { type: "base64", media_type: mediaType, data: b64Data },
+            });
+          }
         } else if (p.type === "tool-call") {
           parts.push({
             type: "tool_use",
