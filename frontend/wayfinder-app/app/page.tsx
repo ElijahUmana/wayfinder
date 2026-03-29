@@ -88,15 +88,14 @@ function MapRoute({ args }: { args: any }) {
           {args.origin.name} → {args.destination.name}
         </div>
         {args.segments && args.segments.length > 0 && (
-          <div className="flex items-center gap-1 overflow-x-auto pb-2">
+          <div className="space-y-1.5 mb-3">
             {args.segments.map((seg: any, i: number) => {
               const isTransit = seg.mode === "TRANSIT" || seg.mode === "BUS";
               return (
-                <div key={i} className="flex items-center gap-1 flex-shrink-0">
-                  <div className={`rounded-full px-2 py-1 text-xs ${isTransit ? "bg-blue-900/50 text-blue-300 border border-blue-700" : "bg-zinc-800 text-zinc-400"}`}>
-                    {isTransit ? "🚌" : "🚶"} {seg.duration}
-                  </div>
-                  {i < args.segments.length - 1 && <div className="w-4 h-px bg-zinc-700" />}
+                <div key={i} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${isTransit ? "bg-blue-900/30 border border-blue-800/50" : "bg-zinc-800/50"}`}>
+                  <span>{isTransit ? "🚌" : "🚶"}</span>
+                  <span className={isTransit ? "text-blue-300 font-medium" : "text-zinc-400"}>{seg.duration}</span>
+                  {seg.transit_info && <span className="text-zinc-300">— {seg.transit_info}</span>}
                 </div>
               );
             })}
@@ -175,15 +174,16 @@ function JourneyChapter({ args, isActive }: { args: any; isActive?: boolean }) {
         </div>
       )}
 
-      {/* Audio Narration */}
+      {/* Audio Narration — auto-plays when active */}
       {args.audio_url && (
         <div className="mx-4 mb-3">
           <div className="text-xs text-zinc-400 mb-1">🔊 Audio Narration</div>
-          <audio controls className="w-full h-10" preload="none">
+          <audio controls autoPlay={isActive} className="w-full h-10" preload="auto">
             <source src={args.audio_url} type="audio/mpeg" />
           </audio>
         </div>
       )}
+      {/* Audio appears silently when ready */}
 
       {/* Spotify */}
       {args.spotify_embed_url && (
@@ -245,45 +245,14 @@ export default function Home() {
     }, 150);
   }, []);
 
-  // Generate TTS for a chapter in the background
-  const generateTTS = useCallback(async (chapter: ToolCall, index: number) => {
-    if (!chapter.result?.narration) return;
-    setTtsLoading((prev) => new Set(prev).add(chapter.toolCallId));
-    try {
-      const resp = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: chapter.result.narration }),
-      });
-      const data = await resp.json();
-      if (data.audio_url) {
-        setJourneyChapters((prev) =>
-          prev.map((ch) =>
-            ch.toolCallId === chapter.toolCallId
-              ? { ...ch, result: { ...ch.result, audio_url: data.audio_url } }
-              : ch
-          )
-        );
-      }
-    } catch {
-      // TTS failure is non-critical
-    } finally {
-      setTtsLoading((prev) => {
-        const next = new Set(prev);
-        next.delete(chapter.toolCallId);
-        return next;
-      });
-    }
-  }, []);
+  // TTS is now generated server-side as part of the chapter tool result
 
   // Start journey playback
   const beginJourney = useCallback(() => {
     setJourneyPhase("playing");
     setRevealedCount(1);
     scrollToChapter(0);
-    // Kick off TTS for all chapters in background
-    chaptersRef.current.forEach((ch, i) => generateTTS(ch, i));
-  }, [scrollToChapter, generateTTS]);
+  }, [scrollToChapter]);
 
   // Advance to next chapter
   const nextChapter = useCallback(() => {
@@ -602,12 +571,26 @@ export default function Home() {
           ))}
 
           {/* Journey Loading Indicator */}
-          {journeyPhase === "loading" && journeyChapters.length === 0 && isLoading && (
-            <div className="my-4 rounded-xl border border-zinc-700 bg-zinc-900 p-4 animate-pulse">
-              <div className="flex items-center gap-2 text-sm text-zinc-400">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-blue-400" />
-                Building your journey experience...
+          {(journeyPhase === "loading" || (journeyPhase === "ready" && journeyChapters.length === 0)) && isLoading && (
+            <div className="my-6 overflow-hidden rounded-2xl border border-zinc-700/50 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-600 border-t-blue-400" />
+                <span className="text-sm font-medium text-white">Building your journey...</span>
               </div>
+              <div className="space-y-2 text-xs text-zinc-400">
+                <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Planning transit route</div>
+                <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Fetching weather data</div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-blue-400" />
+                  Generating chapters with audio narration...
+                </div>
+              </div>
+              <div className="mt-4 h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-purple-500 animate-pulse" style={{ width: `${Math.max(20, (journeyChapters.length / 5) * 100)}%`, transition: "width 0.5s ease" }} />
+              </div>
+              {journeyChapters.length > 0 && (
+                <div className="mt-2 text-xs text-zinc-500">{journeyChapters.length} chapter{journeyChapters.length > 1 ? "s" : ""} ready</div>
+              )}
             </div>
           )}
 
@@ -631,43 +614,34 @@ export default function Home() {
             </div>
           )}
 
-          {/* Journey Chapters (Progressive Reveal) */}
-          {(journeyPhase === "playing" || journeyPhase === "complete") && (
-            <div className="my-6 space-y-1">
-              {journeyChapters.slice(0, revealedCount).map((ch, i) => (
-                <div key={ch.toolCallId}>
-                  {/* Timeline connector */}
-                  {i > 0 && (
-                    <div className="flex justify-center py-1">
-                      <div className="w-px h-6 bg-gradient-to-b from-zinc-700 to-zinc-800" />
-                    </div>
-                  )}
-                  <div
-                    ref={(el) => { if (el) chapterElRefs.current.set(i, el); }}
-                    className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-                    style={{ animationDelay: `${i * 100}ms`, animationFillMode: "backwards" }}
-                  >
-                    <JourneyChapter args={ch.result} isActive={i === revealedCount - 1} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Journey Chapter Carousel (one at a time) */}
+          {(journeyPhase === "playing" || journeyPhase === "complete") && journeyChapters.length > 0 && (
+            <div className="my-6">
+              {/* Current chapter */}
+              <div className="animate-in">
+                <JourneyChapter
+                  key={journeyChapters[Math.min(revealedCount - 1, journeyChapters.length - 1)].toolCallId}
+                  args={journeyChapters[Math.min(revealedCount - 1, journeyChapters.length - 1)].result}
+                  isActive={true}
+                />
+              </div>
 
-          {/* Journey Complete */}
-          {journeyPhase === "complete" && (
-            <div className="text-center py-8">
-              <div className="text-3xl mb-2">🎉</div>
-              <div className="text-lg font-semibold text-white">Journey Complete!</div>
-              <p className="text-xs text-zinc-400 mt-1">
-                You&apos;ve explored the full route to {journeyDestination}
-              </p>
-              <button
-                onClick={resetJourney}
-                className="mt-4 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-              >
-                Explore another destination →
-              </button>
+              {/* Journey Complete */}
+              {journeyPhase === "complete" && (
+                <div className="text-center py-6">
+                  <div className="text-3xl mb-2">🎉</div>
+                  <div className="text-lg font-semibold text-white">Journey Complete!</div>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    You&apos;ve explored the full route to {journeyDestination}
+                  </p>
+                  <button
+                    onClick={resetJourney}
+                    className="mt-4 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    Explore another destination →
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -675,29 +649,48 @@ export default function Home() {
 
       {/* Bottom Bar: Journey Controls or Chat Input */}
       <div className="border-t border-zinc-800 bg-zinc-950/80 backdrop-blur-sm">
-        {/* Journey Player Controls */}
-        {journeyPhase === "playing" && revealedCount < journeyChapters.length && (
+        {/* Journey Carousel Controls */}
+        {(journeyPhase === "playing") && (
           <div className="px-4 py-3">
-            <div className="mx-auto max-w-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-zinc-400">
-                  Chapter {revealedCount} of {journeyChapters.length}
-                </div>
-                {/* Progress bar */}
-                <div className="w-32 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="mx-auto max-w-2xl">
+              {/* Progress dots */}
+              <div className="flex items-center justify-center gap-1.5 mb-3">
+                {journeyChapters.map((_, i) => (
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-300"
-                    style={{ width: `${(revealedCount / journeyChapters.length) * 100}%` }}
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      i === revealedCount - 1 ? "w-6 bg-blue-500" : i < revealedCount ? "w-1.5 bg-blue-500/40" : "w-1.5 bg-zinc-700"
+                    }`}
                   />
-                </div>
+                ))}
               </div>
-              <button
-                onClick={nextChapter}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
-              >
-                Next: {journeyChapters[revealedCount]?.result?.title || "Chapter"}
-                <span>→</span>
-              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => { if (revealedCount > 1) setRevealedCount(revealedCount - 1); }}
+                  disabled={revealedCount <= 1}
+                  className="flex items-center gap-1 text-zinc-400 hover:text-white disabled:text-zinc-700 text-sm transition-colors px-3 py-2"
+                >
+                  ← Prev
+                </button>
+                <div className="text-xs text-zinc-400 font-medium">
+                  {revealedCount} / {journeyChapters.length}
+                </div>
+                {revealedCount < journeyChapters.length ? (
+                  <button
+                    onClick={nextChapter}
+                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setJourneyPhase("complete")}
+                    className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    Finish 🎉
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

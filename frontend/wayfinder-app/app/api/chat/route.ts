@@ -219,8 +219,22 @@ async function executeTool(
   if (name === "generate_journey_chapter") {
     const mood = args.music_mood || "explore";
     const playlist = MOOD_PLAYLISTS[mood] || MOOD_PLAYLISTS.explore;
+    // Generate TTS audio inline — so audio_url comes with the chapter data
+    let audio_url: string | null = null;
+    if (args.narration) {
+      try {
+        const ttsResp = await fetch(`${BACKEND_URL}/api/tools/tts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: args.narration }),
+        });
+        const ttsData = await ttsResp.json();
+        audio_url = ttsData.audio_url || null;
+      } catch {}
+    }
     return {
       ...args,
+      audio_url,
       spotify_embed_url: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
       spotify_playlist_name: playlist.name,
     };

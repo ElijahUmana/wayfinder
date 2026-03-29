@@ -34,7 +34,6 @@ app = FastAPI(title="Wayfinder API")
 
 @app.on_event("startup")
 async def startup():
-    """Pre-initialize the Augment knowledge base on server start."""
     try:
         augment_kb._get_context()
         print("Augment knowledge base initialized")
@@ -461,7 +460,8 @@ async def tool_tts(request: Request):
     body = await request.json()
     text = body.get("text", "")
     voice = body.get("voice", "Aria")
-    url = gradient.text_to_speech(text, voice)
+    # Run blocking TTS in thread so multiple requests process in parallel
+    url = await asyncio.to_thread(gradient.text_to_speech, text, voice)
     return {"audio_url": url}
 
 

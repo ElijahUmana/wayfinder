@@ -2,8 +2,6 @@
 
 Upload a photo of a place. Wayfinder identifies it, plans a public transit route from where you are, and builds an **immersive chapter-by-chapter guided journey** — not directions, but a full experience. Every bus ride, every transfer, every arrival gets its own AI narration, soundtrack, weather data, and points of interest.
 
-**Live Demo:** [wayfinder-app.vercel.app](https://wayfinder-app.vercel.app)
-
 ![Wayfinder Screenshot](docs/screenshot.png)
 
 ## The Experience
@@ -72,13 +70,14 @@ Upload a photo of a place. Wayfinder identifies it, plans a public transit route
 - **Journey memory** — indexes past journeys for cross-journey search ("Show me all sunset spots I've saved")
 - Auto-initializes on server startup for instant search
 
-### assistant-ui Integration
+### Custom React Frontend
 - Custom tool UI components for rich rendering:
-  - `generate_journey_chapter` — Chapter cards with gradient backgrounds, narration, transit info, POIs, Spotify embeds
+  - `generate_journey_chapter` — Chapter cards with gradient backgrounds, narration, transit info, POIs, Spotify embeds, audio narration
   - `show_weather_card` — Weather display with temperature, conditions, humidity, wind, best-time tips
   - `show_map_route` — OpenStreetMap embed with segment timeline and POI markers
-- Progressive chapter reveal with "Begin Journey" CTA and step-by-step navigation
+- Progressive chapter reveal with "Begin Journey" CTA and step-by-step carousel navigation
 - SSE stream parsing with real-time tool call rendering
+- Loading progress bar with live chapter count during journey generation
 
 ### Additional Integrations
 - **Google Maps APIs** — Geocoding, Directions (transit mode), Places for POI discovery
@@ -142,7 +141,6 @@ npm run dev
 - **Augment Code** ($3,500) — Deep Context Engine integration with 15+ indexed documents, semantic search, RAG, and journey memory
 - **Railtracks** ($1,300) — Full multi-agent orchestration with 9 function nodes and Flow-based pipeline
 - **DigitalOcean** ($1,000) — Vision, TTS, image generation, and LLM inference via Gradient AI
-- **assistant-ui** ($800) — Custom tool UI components with progressive reveal and rich rendering
 - **General** — Novel application combining transit, weather, music, narration, and knowledge into one immersive experience
 
 ## License
