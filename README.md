@@ -121,20 +121,6 @@ npm run dev
 - `AUGMENT_API_TOKEN` — Augment Context Engine for knowledge base
 - `GOOGLE_MAPS_API_KEY` — Google Maps for geocoding and transit directions
 
-## Demo Script (3 minutes)
-
-1. **Welcome** (0:00-0:15): Show the Wayfinder landing page with hero and destination suggestions
-2. **Upload Photo** (0:15-0:30): Upload a photo of the Golden Gate Bridge
-3. **AI Processing** (0:30-1:00): Watch vision AI identify the location, plan_journey fetch real transit data, weather card and map appear
-4. **Begin Journey** (1:00-1:15): Click "Begin Your Journey" — see the chapter count and journey stats
-5. **Chapter Walkthrough** (1:15-2:30): Step through 4-5 chapters, highlighting:
-   - Vivid local narration with specific details
-   - Different Spotify moods per segment
-   - Transit info with actual bus lines and stops
-   - POIs along the route
-   - Audio narration playing
-6. **Journey Complete** (2:30-2:45): Show the completion screen
-7. **Knowledge Base** (2:45-3:00): Ask a follow-up question to demonstrate Augment knowledge base search
 
 ## Hackathon Prize Tracks
 
